@@ -4,29 +4,25 @@
 import { GetStoreData, SetStoreData } from '../helpers/General';
 
 function BuildLocalFormat(placeVisit) {
-  return (loc = {
+  return {
     latitude: placeVisit.location.latitudeE7 * 10 ** -7,
     longitude: placeVisit.location.longitudeE7 * 10 ** -7,
     time: placeVisit.duration.startTimestampMs,
-  });
+  };
 }
 
 function LocationExists(localDataJSON, loc) {
-  let wasImportedBefore = false;
-
-  for (let index = 0; index < localDataJSON.length; ++index) {
-    let storedLoc = localDataJSON[index];
+  for (const storedLoc of localDataJSON) {
     if (
-      storedLoc.latitude == loc.latitude &&
-      storedLoc.longitude == loc.longitude &&
-      storedLoc.time == loc.time
+      storedLoc.latitude === loc.latitude &&
+      storedLoc.longitude === loc.longitude &&
+      storedLoc.time === loc.time
     ) {
-      wasImportedBefore = true;
-      break;
+      return true;
     }
   }
 
-  return wasImportedBefore;
+  return false;
 }
 
 function InsertIfNew(localDataJSON, loc) {
@@ -52,18 +48,16 @@ function Merge(localDataJSON, googleDataJSON) {
 }
 
 export async function MergeJSONWithLocalData(googleDataJSON) {
-  GetStoreData('LOCATION_DATA').then(locationArray => {
-    let locationData;
+  const locationArray = await GetStoreData('LOCATION_DATA');
+  let locationData;
 
-    if (locationArray !== null) {
-      locationData = JSON.parse(locationArray);
-    } else {
-      locationData = [];
-    }
+  if (locationArray !== null) {
+    locationData = JSON.parse(locationArray);
+  } else {
+    locationData = [];
+  }
 
-    Merge(locationData, googleDataJSON);
+  Merge(locationData, googleDataJSON);
 
-    console.log('Saving on array');
-    SetStoreData('LOCATION_DATA', locationData);
-  });
+  return SetStoreData('LOCATION_DATA', locationData);
 }

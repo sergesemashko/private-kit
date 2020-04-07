@@ -8,12 +8,10 @@ import {
   Image,
   TouchableOpacity,
   BackHandler,
-  ActivityIndicator,
   Linking,
 } from 'react-native';
 
 import colors from '../constants/colors';
-import WebView from 'react-native-webview';
 import backArrow from './../assets/images/backArrow.png';
 import { ImportTakeoutData } from '../helpers/GoogleTakeOutAutoImport';
 import languages from './../locales/languages';
@@ -47,12 +45,25 @@ class ImportScreen extends Component {
     BackHandler.removeEventListener('hardwareBackPress', this.handleBackPress);
   }
 
-  importPickFile() {
-    PickFile().then(filePath =>
-      ImportTakeoutData(filePath).catch(err => {
-        console.log(err);
-      }),
-    );
+  async importPickFile() {
+    try {
+      const filePath = await PickFile();
+      await ImportTakeoutData(filePath);
+      /**
+       * TODO: display success message with inserted locations count.
+       * Also, add different message if no locations were added.
+       * For now just redirecting back to home screen on success.
+       */
+      await this.backToMain();
+    } catch (err) {
+      /**
+       * @TODO: add handling of various errors and exceptions and display a message.
+       * Add messages:
+       * - for wrong archive format
+       * - general error message
+       */
+      console.error('[Error]', err);
+    }
   }
 
   render() {
