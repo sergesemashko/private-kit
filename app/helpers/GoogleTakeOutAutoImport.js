@@ -2,9 +2,11 @@
  * Checks the download folder, unzips and imports all data from Google TakeOut
  */
 import { unzip, subscribe } from 'react-native-zip-archive';
-import { MergeJSONWithLocalData } from '../helpers/GoogleData';
+import { mergeJSONWithLocalData } from '../helpers/GoogleData';
 import { Platform } from 'react-native';
 import RNFS from 'react-native-fs';
+
+export class NoRecentLocationsError extends Error {}
 
 let progress;
 const MONTHS = [
@@ -61,14 +63,21 @@ export async function ImportTakeoutData(filePath) {
         console.log('[INFO] Unzipping', Math.trunc(progress * 100), '%');
     },
   );
+
   const extractDir = `${
     RNFS.CachesDirectoryPath
   }/Takeout-${new Date().toISOString()}`;
+
   console.log('[INFO] Takeout import start. Path:', unifiedPath);
+
+  let newLocations = [];
   let path;
+  let parsedFilesCount = 0;
   try {
     path = await unzip(unifiedPath, extractDir);
+
     console.log(`[INFO] Unzip Completed for ${path}`);
+
     const monthlyLocationFiles = getFilenamesForLatest2Months(path);
     for (const filepath of monthlyLocationFiles) {
       console.log('[INFO] File to import:', filepath);
@@ -77,16 +86,25 @@ export async function ImportTakeoutData(filePath) {
       if (isExist) {
         const contents = await RNFS.readFile(filepath);
 
-        await MergeJSONWithLocalData(JSON.parse(contents));
+        newLocations = [
+          ...newLocations,
+          ...(await mergeJSONWithLocalData(JSON.parse(contents))),
+        ];
+
         console.log('[INFO] Imported file:', filepath);
+        parsedFilesCount++;
       }
     }
   } catch (err) {
     console.error('[Error] Failed to import Google Takeout', err);
   }
+  // clean up unzipped folders
   if (path) {
-    // clean up the extracted folder
     await RNFS.unlink(path);
   }
   progress.remove();
+  if (parsedFilesCount === 0) {
+    throw new NoRecentLocationsError();
+  }
+  return newLocations;
 }

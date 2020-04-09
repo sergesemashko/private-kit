@@ -3,7 +3,7 @@
  */
 import { GetStoreData, SetStoreData } from '../helpers/General';
 
-function BuildLocalFormat(placeVisit) {
+function formatLocation(placeVisit) {
   return {
     latitude: placeVisit.location.latitudeE7 * 10 ** -7,
     longitude: placeVisit.location.longitudeE7 * 10 ** -7,
@@ -11,7 +11,7 @@ function BuildLocalFormat(placeVisit) {
   };
 }
 
-function LocationExists(localDataJSON, loc) {
+function hasLocation(localDataJSON, loc) {
   for (const storedLoc of localDataJSON) {
     if (
       storedLoc.latitude === loc.latitude &&
@@ -25,39 +25,32 @@ function LocationExists(localDataJSON, loc) {
   return false;
 }
 
-function InsertIfNew(localDataJSON, loc) {
-  if (!LocationExists(localDataJSON, loc)) {
-    console.log('Importing', loc);
-    localDataJSON.push(loc);
-  } else {
-    console.log('Existing', loc, localDataJSON.indexOf(loc));
-  }
+function extractNewLocations(storedLocations, googleLocationHistory) {
+  return (googleLocationHistory?.timelineObjects || []).reduce(
+    (newLocations, location) => {
+      // Only import visited places, not paths for now
+      if (location?.placeVisit) {
+        const formattedLoc = formatLocation(location.placeVisit);
+        if (!hasLocation(storedLocations, formattedLoc)) {
+          newLocations.push(formattedLoc);
+        }
+      }
+      return newLocations;
+    },
+    [],
+  );
 }
 
-function Merge(localDataJSON, googleDataJSON) {
-  googleDataJSON.timelineObjects.map(function(
-    data,
-    //index
-  ) {
-    // Only import visited places, not paths for now
-    if (data.placeVisit) {
-      let loc = BuildLocalFormat(data.placeVisit);
-      InsertIfNew(localDataJSON, loc);
-    }
-  });
-}
+export async function mergeJSONWithLocalData(googleLocationHistory) {
+  let storedLocations = await GetStoreData('LOCATION_DATA', false);
+  storedLocations = Array.isArray(storedLocations) ? storedLocations : [];
 
-export async function MergeJSONWithLocalData(googleDataJSON) {
-  const locationArray = await GetStoreData('LOCATION_DATA');
-  let locationData;
+  const newLocations = extractNewLocations(
+    storedLocations,
+    googleLocationHistory,
+  );
 
-  if (locationArray !== null) {
-    locationData = JSON.parse(locationArray);
-  } else {
-    locationData = [];
-  }
+  await SetStoreData('LOCATION_DATA', [...storedLocations, ...newLocations]);
 
-  Merge(locationData, googleDataJSON);
-
-  return SetStoreData('LOCATION_DATA', locationData);
+  return newLocations;
 }

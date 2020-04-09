@@ -1,86 +1,68 @@
-import React, { Component } from 'react';
+import React, { useState } from 'react';
 import {
   Dimensions,
-  SafeAreaView,
   StyleSheet,
   View,
   Text,
-  Image,
   TouchableOpacity,
-  BackHandler,
   Linking,
 } from 'react-native';
 
 import colors from '../constants/colors';
-import backArrow from './../assets/images/backArrow.png';
-import { ImportTakeoutData } from '../helpers/GoogleTakeOutAutoImport';
+import fontFamily from '../constants/fonts';
+import {
+  ImportTakeoutData,
+  NoRecentLocationsError,
+} from '../helpers/GoogleTakeOutAutoImport';
 import languages from './../locales/languages';
 import { PickFile } from '../helpers/General';
 
 const width = Dimensions.get('window').width;
 
-class ImportScreen extends Component {
-  constructor(props) {
-    super(props);
-  }
+import NavigationBarWrapper from '../components/NavigationBarWrapper';
 
-  backToMain() {
-    this.props.navigation.navigate('LocationTrackingScreen', {});
-  }
+const makeImportResults = (label = '', error = false) => ({
+  error,
+  label,
+});
 
-  handleBackPress = () => {
-    this.props.navigation.navigate('LocationTrackingScreen', {});
-    return true;
-  };
+const ImportScreen = props => {
+  const {
+    navigation: { goBack },
+  } = props;
+  const [importResults, setImportResults] = useState(makeImportResults());
 
-  hideSpinner() {
-    this.setState({ visible: false });
-  }
-
-  componentDidMount() {
-    BackHandler.addEventListener('hardwareBackPress', this.handleBackPress);
-  }
-
-  componentWillUnmount() {
-    BackHandler.removeEventListener('hardwareBackPress', this.handleBackPress);
-  }
-
-  async importPickFile() {
+  async function importPickFile() {
     try {
+      // reset info message
+      setImportResults(makeImportResults());
+
       const filePath = await PickFile();
-      await ImportTakeoutData(filePath);
-      /**
-       * TODO: display success message with inserted locations count.
-       * Also, add different message if no locations were added.
-       * For now just redirecting back to home screen on success.
-       */
-      await this.backToMain();
+      if (filePath) {
+        const newLocations = await ImportTakeoutData(filePath);
+        if (newLocations.length) {
+          setImportResults(makeImportResults('label.import_success'));
+        } else {
+          setImportResults(makeImportResults('label.import_already_imported'));
+        }
+      }
     } catch (err) {
-      /**
-       * @TODO: add handling of various errors and exceptions and display a message.
-       * Add messages:
-       * - for wrong archive format
-       * - general error message
-       */
-      console.error('[Error]', err);
+      if (err instanceof NoRecentLocationsError) {
+        setImportResults(
+          makeImportResults('label.import_no_recent_locations', true),
+        );
+      } else {
+        setImportResults(makeImportResults('label.import_error', true));
+      }
     }
   }
 
-  render() {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.headerContainer}>
-          <TouchableOpacity
-            style={styles.backArrowTouchable}
-            onPress={() => this.backToMain()}>
-            <Image style={styles.backArrow} source={backArrow} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {languages.t('label.import_title')}
-          </Text>
-        </View>
-
-        <View style={styles.main}>
+  return (
+    <NavigationBarWrapper
+      title={languages.t('label.import_title')}
+      onBackPress={goBack}>
+      <View style={styles.main}>
+        <View style={styles.subHeaderTitle}>
           <Text style={styles.sectionDescription}>
             {languages.t('label.import_step_1')}
           </Text>
@@ -102,17 +84,27 @@ class ImportScreen extends Component {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => this.importPickFile()}
+            onPress={importPickFile}
             style={styles.buttonTouchable}>
             <Text style={styles.buttonText}>
               {languages.t('label.import_title').toUpperCase()}
             </Text>
           </TouchableOpacity>
+
+          {importResults.label ? (
+            <Text
+              style={{
+                ...styles.importResults,
+                ...(importResults?.error ? styles.importResultsError : {}),
+              }}>
+              {languages.t(importResults.label)}
+            </Text>
+          ) : null}
         </View>
-      </SafeAreaView>
-    );
-  }
-}
+      </View>
+    </NavigationBarWrapper>
+  );
+};
 
 const styles = StyleSheet.create({
   // Container covers the entire screen
@@ -132,14 +124,14 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'column',
     textAlignVertical: 'top',
-    // alignItems: 'center',
-    padding: 20,
-    width: '96%',
+    paddingLeft: 20,
+    paddingRight: 20,
+    width: '100%',
     alignSelf: 'center',
   },
   buttonTouchable: {
     borderRadius: 12,
-    backgroundColor: '#665eff',
+    backgroundColor: colors.VIOLET,
     height: 52,
     alignSelf: 'center',
     width: width * 0.7866,
@@ -147,28 +139,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: {
-    fontFamily: 'OpenSans-Bold',
+    fontFamily: fontFamily.primarySemiBold,
     fontSize: 14,
     lineHeight: 19,
     letterSpacing: 0,
     textAlign: 'center',
-    color: '#ffffff',
+    color: colors.WHITE,
   },
-  mainText: {
-    fontSize: 18,
-    lineHeight: 24,
-    fontWeight: '400',
-    textAlignVertical: 'center',
-    padding: 20,
-  },
-  smallText: {
-    fontSize: 10,
-    lineHeight: 24,
-    fontWeight: '400',
-    textAlignVertical: 'center',
-    padding: 20,
-  },
-
   headerContainer: {
     flexDirection: 'row',
     height: 60,
@@ -188,13 +165,24 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontFamily: 'OpenSans-Bold',
+    fontFamily: fontFamily.primaryRegular,
   },
   sectionDescription: {
     fontSize: 16,
     lineHeight: 24,
     marginTop: 12,
-    fontFamily: 'OpenSans-Regular',
+    fontFamily: fontFamily.primaryRegular,
+  },
+  importResults: {
+    fontSize: 12,
+    lineHeight: 20,
+    marginTop: 10,
+    textAlign: 'center',
+    fontFamily: fontFamily.primaryRegular,
+    color: colors.VIOLET_TEXT,
+  },
+  importResultsError: {
+    color: colors.RED_TEXT,
   },
 });
 export default ImportScreen;
