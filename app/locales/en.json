@@ -43,6 +43,7 @@
     "import_error":"Something went wrong while importing your data.",
     "import_no_recent_locations": "Takeout doesn't have any recent locations.",
     "import_invalid_file_format": "Provided file format is not supported. \nSupported formats: \".zip\".",
+    "import_storage_permissions_prompt": "Please, allow using storage to import locations:\n 1. Press \"Open settings\",\n 2. Go to \"Permissions\" -> \"Storage\"\n 3. Press \"Allow\"",
     "latest_news": "Latest News",
     "launch_done_header": "All finished",
     "launch_done_subheader": "You’re ready to roll. Remember, you can always update your preferences later.",

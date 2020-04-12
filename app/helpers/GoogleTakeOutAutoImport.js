@@ -103,7 +103,7 @@ export async function importTakeoutData(filePath) {
       }
     }
   } catch (err) {
-    console.error('[Error] Failed to import Google Takeout', err);
+    console.log('[Error] Failed to import Google Takeout', err);
   }
   // clean up unzipped folders
   if (path) {

@@ -6,8 +6,15 @@ import {
   Text,
   TouchableOpacity,
   Linking,
+  Alert,
 } from 'react-native';
-
+import { isPlatformiOS } from '../Util';
+import {
+  request,
+  PERMISSIONS,
+  RESULTS,
+  openSettings,
+} from 'react-native-permissions';
 import colors from '../constants/colors';
 import fontFamily from '../constants/fonts';
 import {
@@ -27,24 +34,54 @@ const makeImportResults = (label = '', error = false) => ({
   label,
 });
 
+const getStoragePermission = () => {
+  return isPlatformiOS()
+    ? PERMISSIONS.IOS.STOREKIT
+    : PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE;
+};
+
 const ImportScreen = props => {
   const {
     navigation: { goBack },
   } = props;
   const [importResults, setImportResults] = useState(makeImportResults());
 
+  function promptStorePermission() {
+    Alert.alert(
+      '',
+      languages.t('label.import_storage_permissions_prompt'),
+      [
+        { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+        { text: 'Open settings', onPress: () => openSettings() },
+      ],
+      { cancelable: false },
+    );
+  }
+
+  async function requestStorage() {
+    const permissionStatus = await request(getStoragePermission());
+    if (permissionStatus === RESULTS.BLOCKED) {
+      promptStorePermission();
+      return false;
+    }
+    return permissionStatus === RESULTS.GRANTED;
+  }
+
   async function importPickFile() {
     try {
       // reset info message
       setImportResults(makeImportResults());
-
-      const filePath = await pickFile();
-      if (filePath) {
-        const newLocations = await importTakeoutData(filePath);
-        if (newLocations.length) {
-          setImportResults(makeImportResults('label.import_success'));
-        } else {
-          setImportResults(makeImportResults('label.import_already_imported'));
+      if (await requestStorage()) {
+        const filePath = await pickFile();
+        if (filePath) {
+          const newLocations = await importTakeoutData(filePath);
+          if (newLocations.length) {
+            setImportResults(makeImportResults('label.import_success'));
+          } else {
+            setImportResults(
+              makeImportResults('label.import_already_imported'),
+            );
+          }
         }
       }
     } catch (err) {
