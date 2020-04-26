@@ -15,6 +15,13 @@ export const DEFAULT_EXPOSURE_PERIOD_MINUTES = 5;
 export const CONCERN_TIME_WINDOW_MINUTES = 4 * 60; // 4 hours, in minutes
 
 /**
+ * The desired location interval, and the minimum acceptable interval.
+ * Time (in milliseconds) between location information polls.  E.g. 60000*5 = 5 minutes
+ * @type {number}
+ */
+export const GPS_POLL_INTERVAL = 60000 * 5;
+
+/**
  * Format of a single history item
  *
  * @typedef {{

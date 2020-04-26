@@ -1,3 +1,4 @@
+import { GPS_POLL_INTERVAL } from '../constants/history';
 import { LOCATION_DATA } from '../constants/storage';
 /**
  * Import a Google JSon into the Database.
@@ -24,14 +25,32 @@ function toFixedNumber(num, digits) {
  * @param placeVisit - google place object
  * @returns {{latitude: number, time: string, longitude: number}}
  */
-function formatLocation(placeVisit) {
-  return {
-    latitude: toFixedNumber(placeVisit.location.latitudeE7 * 10 ** -7, 7),
-    longitude: toFixedNumber(placeVisit.location.longitudeE7 * 10 ** -7, 7),
-    time: placeVisit.duration.startTimestampMs,
-  };
+function extractHearbeats(placeVisit) {
+  const latitude = toFixedNumber(placeVisit.location.latitudeE7 * 10 ** -7, 7);
+  const longitude = toFixedNumber(
+    placeVisit.location.longitudeE7 * 10 ** -7,
+    7,
+  );
+  const hearbeats = [];
+  let time = placeVisit.duration.startTimestampMs;
+  while (time < placeVisit.duration.endTimestampMs) {
+    hearbeats.push({
+      latitude,
+      longitude,
+      time,
+    });
+    time += GPS_POLL_INTERVAL;
+  }
+
+  return hearbeats;
 }
 
+/**
+ * Checks whether an entry has a valid location
+ * @param localDataJSON
+ * @param loc
+ * @returns {boolean}
+ */
 function hasLocation(localDataJSON, loc) {
   for (const storedLoc of localDataJSON) {
     if (
@@ -46,15 +65,21 @@ function hasLocation(localDataJSON, loc) {
   return false;
 }
 
+/**
+ * Finds and returns a list of new locations
+ * @param storedLocations
+ * @param googleLocationHistory
+ * @returns {any | Array}
+ */
 function extractNewLocations(storedLocations, googleLocationHistory) {
   return (googleLocationHistory?.timelineObjects || []).reduce(
     (newLocations, location) => {
       // Only import visited places, not paths for now
       if (location?.placeVisit) {
-        const formattedLoc = formatLocation(location.placeVisit);
-        if (!hasLocation(storedLocations, formattedLoc)) {
-          newLocations.push(formattedLoc);
-        }
+        const hearbeats = extractHearbeats(location.placeVisit).filter(
+          heartbeat => !hasLocation(storedLocations, heartbeat),
+        );
+        return [...newLocations, ...hearbeats];
       }
       return newLocations;
     },
@@ -62,6 +87,13 @@ function extractNewLocations(storedLocations, googleLocationHistory) {
   );
 }
 
+/**
+ * Parses google location history, adds and
+ * returns new location points
+ *
+ * @param googleLocationHistory
+ * @returns {Promise<any|Array>}
+ */
 export async function mergeJSONWithLocalData(googleLocationHistory) {
   let storedLocations = await GetStoreData(LOCATION_DATA, false);
   storedLocations = Array.isArray(storedLocations) ? storedLocations : [];
